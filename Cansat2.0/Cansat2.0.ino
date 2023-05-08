@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <SoftwareSerial.h>
 
+//Libreria del GPS
+#include <TinyGPSPlus.h>
 //Librerias de sensores de altitud y movimiento
 #include <Adafruit_BMP280.h>
 #include <MPU9250_asukiaaa.h> 
@@ -10,6 +12,8 @@ Servo myservo;
 
 Adafruit_BMP280 bmp;
 MPU9250_asukiaaa mySensor;
+// The TinyGPSPlus object
+TinyGPSPlus gps;
 
 //Libreria de la sd
 #include <SPI.h>
@@ -18,10 +22,13 @@ MPU9250_asukiaaa mySensor;
 #define buzzer 4
 #define led 5
 
+static const int Gps_RXPin = 3, Gps_TXPin = 2;
+static const uint32_t GPSBaud = 9600;
+
 
 int pos_Servo = 0;    // variable to store the servo position
-SoftwareSerial gps(3,2);//rx tx 
-float Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection;
+SoftwareSerial gps_ss(Gps_RXPin,Gps_TXPin);//rx tx 
+float Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection,Latitud,Longitud,hora,minuto,segundo;
 uint8_t sensorId;
 int result;
 
@@ -33,7 +40,7 @@ void setup() {
   myservo.attach(6);  // attaches the servo on pin A3 to the servo object
 
   Serial.begin(9600);
-  gps.begin(9600); 
+  gps_ss.begin(9600); 
   //Comprobamos sensor de altitud movimiento:
   mySensor.beginAccel();
   mySensor.beginGyro();
@@ -67,23 +74,25 @@ void loop() {
   delay(100);
 
 
-//Estos comentarios son lo que falta programar 
-  // float* datos_GPS = GPS();
+  //Parte del gps
+    float* datos_gps = gpsFuncion();
+    guardadito(datos_gps);//Guardamos los datos
+  delay(100);
 
-  // void guardadito(float* datos_GPS);//Guardamos los datos
-  // delay(100);
+//Ahora la altitud en cdmx es de 2,240, en teoria el cansat deberia caer desde 2,640 y abrir el autogiro en 2,390
+  if(datos_AltMov[3] == 250){
+    //Desplegamos el autogiro
+      for (pos_Servo = 0; pos_Servo <= 180; pos_Servo += 1) { // goes from 0 degrees to 180 degrees
+      // in steps of 1 degree
+      myservo.write(pos_Servo);              // tell servo to go to position in variable 'pos'
+      delay(15);                       // waits 15 ms for the servo to reach the position
+    }
+  }
 
-  //if(ya pasamos 250m){
-    //   for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
-    //   // in steps of 1 degree
-    //   myservo.write(pos);              // tell servo to go to position in variable 'pos'
-    //   delay(15);                       // waits 15 ms for the servo to reach the position
-    // }
-  //}
-
-  // if(Ya aterrizamos ==True){
-  //   alarma();
-  // }
+  if(datos_AltMov[3] ==2240){
+    //alarma();
+    Serial.println("Ya llegamossssss");
+  }
 
 }
 
@@ -189,12 +198,52 @@ void guardadito(float* arreglo){
   }
 }
 
-//La funcion para leer los datos del gps, a esta parte falta darle formato para que entregue unicamente la posicion del cansat. Con el link que te mande puedes ver como entrega 
+//La funcion para leer los datos del gps, queremos que entregue latitud, longitud, y tiempo
 // la posicion este gps
-void gpsFuncion(){
-   char gpsDatos=' ';
-  if(gps.available()){
-    gpsDatos=gps.read();
-    Serial.print(gpsDatos);
+float* gpsFuncion(){
+  Serial.print(F("Location: ")); 
+  if (gps.location.isValid())
+  {
+    Latitud = gps.location.lat();
+    Longitud = gps.location.lng();
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
   }
+  else
+  {
+    Latitud = 0.0;
+    Longitud = 0.0;
+    Serial.print(F("INVALID"));
+  }
+
+  Serial.print(F("  Time: "));
+
+  Serial.print(F(" "));
+  if (gps.time.isValid())
+  {
+    if (gps.time.hour() < 10) Serial.print(F("0"));
+    hora = gps.time.hour();
+    minuto=gps.time.minute();
+    segundo=gps.time.second();
+    Serial.print(gps.time.hour());
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F("."));
+    if (gps.time.centisecond() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.centisecond());
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
+//  Serial.println(gps.speed.mps()); // Speed in meters per second (double)
+  Serial.println();
+    float valores[5]={Latitud,Longitud,hora,minuto,segundo};
+return(valores);
 }
+
