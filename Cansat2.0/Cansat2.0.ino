@@ -1,6 +1,7 @@
-#include <stdio.h>
 #include <SoftwareSerial.h>
 
+//Libreria del GPS
+#include <TinyGPSPlus.h>
 //Librerias de sensores de altitud y movimiento
 #include <Adafruit_BMP280.h>
 #include <MPU9250_asukiaaa.h> 
@@ -10,6 +11,8 @@ Servo myservo;
 
 Adafruit_BMP280 bmp;
 MPU9250_asukiaaa mySensor;
+// The TinyGPSPlus object
+TinyGPSPlus gps;
 
 //Libreria de la sd
 #include <SPI.h>
@@ -18,12 +21,18 @@ MPU9250_asukiaaa mySensor;
 #define buzzer 4
 #define led 5
 
+static const int Gps_RXPin = 3, Gps_TXPin = 2;
+static const uint32_t GPSBaud = 9600;
+
 
 int pos_Servo = 0;    // variable to store the servo position
-SoftwareSerial gps(3,2);//rx tx 
-float Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection;
+SoftwareSerial gps_ss(Gps_RXPin,Gps_TXPin);//rx tx 
+float Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection,Latitud,Longitud,hora,minuto,segundo;
+float datos_AltMov[14];
+float datos_gps[14];
 uint8_t sensorId;
 int result;
+
 
 void setup() {
 
@@ -33,7 +42,7 @@ void setup() {
   myservo.attach(6);  // attaches the servo on pin A3 to the servo object
 
   Serial.begin(9600);
-  gps.begin(9600); 
+  gps_ss.begin(9600); 
   //Comprobamos sensor de altitud movimiento:
   mySensor.beginAccel();
   mySensor.beginGyro();
@@ -42,7 +51,6 @@ void setup() {
   // mySensor.magXOffset = -50;
   // mySensor.magYOffset = -55;
   // mySensor.magZOffset = -10;
-
   bmp.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
                   Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
@@ -54,94 +62,63 @@ void setup() {
   Serial.print("Initializing SD card...");
   if (!SD.begin(10)) {
     Serial.println("Card failed, or not present");
-    // don't do anything more:
-    while (1);
+    // don't do anything more:  }
   }
+    else{
   Serial.println("card initialized.");
+  }
 }
+
+
 
 void loop() {
-  float* datos_AltMov = altitudmovimiento();
+  //Guardamos los datos en dos arrays
+  altitudmovimiento();
+  gpsFuncion();
 
-  guardadito(datos_AltMov);//Guardamos los datos
-  delay(100);
 
+//Imprimimos los datos de cada cosa
+    Serial.write("GY-91:");  
 
-//Estos comentarios son lo que falta programar 
-  // float* datos_GPS = GPS();
+  Serial.println();
 
-  // void guardadito(float* datos_GPS);//Guardamos los datos
-  // delay(100);
+  for(int i = 0; i < 15; i++){
+    String envio = String(datos_AltMov[i]);
+    for (int j = 0; j < 10; j++){
+    Serial.write(envio[j]);
+    }
+    Serial.write(",");
+    Serial.println();
+    delay(100);
+  }  
+  Serial.print("Gps:");
+  Serial.println();
+  for(int i = 0; i < 6; i++){
+    String envio = String(datos_gps[i]);
+    for (int j = 0; j < 10; j++){
+    Serial.write(envio[j]);
+    }
+    Serial.println();
+    delay(100);
+  }  
 
-  //if(ya pasamos 250m){
-    //   for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
-    //   // in steps of 1 degree
-    //   myservo.write(pos);              // tell servo to go to position in variable 'pos'
-    //   delay(15);                       // waits 15 ms for the servo to reach the position
-    // }
-  //}
+// //Ahora la altitud en cdmx es de 2,240, en teoria el cansat deberia caer desde 2,640 y abrir el autogiro en 2,390
+//   if(datos_AltMov[3] == 250){
+//     //Desplegamos el autogiro
+//       for (pos_Servo = 0; pos_Servo <= 180; pos_Servo += 1) { // goes from 0 degrees to 180 degrees
+//       // in steps of 1 degree
+//       myservo.write(pos_Servo);              // tell servo to go to position in variable 'pos'
+//       delay(15);                       // waits 15 ms for the servo to reach the position
+//     }
+//   }
 
-  // if(Ya aterrizamos ==True){
-  //   alarma();
-  // }
+//   if(datos_AltMov[3] ==2240){
+//     //alarma();
+//     Serial.println("Ya llegamossssss");
+//   }
 
 }
 
-
-//Esta funcion te entrega los valores del sensor gy 91
-float* altitudmovimiento(){
- //Declaramos la lista que regresara el valor de cada variable
-  Temp = bmp.readTemperature();
-  Pres = bmp.readPressure();
-  Alt = bmp.readAltitude(1013.25); /* Adjusted to local forecast! */
-  Serial.print(Temp);
-  Serial.print(",");
-  Serial.print(Pres);
-  Serial.print(",");
-  Serial.print(Alt);
-  Serial.print(",");
-
-  mySensor.accelUpdate();
-  aX = mySensor.accelX();
-  aY = mySensor.accelY();
-  aZ = mySensor.accelZ();
-  aSqrt = mySensor.accelSqrt();
-  Serial.print(aX);
-  Serial.print(",");
-  Serial.print(aY);
-  Serial.print(",");
-  Serial.print(aZ);
-  Serial.print(",");
-  Serial.print(aSqrt);
-  Serial.print(",");
-  
-  mySensor.gyroUpdate();
-  gX = mySensor.gyroX();
-  gY = mySensor.gyroY();
-  gZ = mySensor.gyroZ();
-  Serial.print(gX);
-  Serial.print(",");
-  Serial.print(gY);
-  Serial.print(",");
-  Serial.print(gZ);
-  Serial.print(",");
-
-  mySensor.magUpdate();
-  mX = mySensor.magX();
-  mY = mySensor.magY();
-  mZ = mySensor.magZ();
-  mySensor.magHorizDirection();
-  mDirection = mySensor.magHorizDirection();
-  Serial.print(mX);
-  Serial.print(",");
-  Serial.print(mY);
-  Serial.print(",");
-  Serial.print(mZ);
-  Serial.print(",");
-  Serial.println(mDirection);
-  float valores[14]={Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection};
-  return(valores);
-}
 
 //La funcion para encontrar el cansat una vez que caiga
 void alarma(){
@@ -157,8 +134,10 @@ void alarma(){
 }
 
 //La funcion guardadito toma un arreglo y lo guarda en la ssd
+//La funcion guardadito toma un arreglo y lo guarda en la ssd
 void guardadito(float* arreglo){
-  int tamano = sizeof(arreglo);
+  //int tamano = sizeof(arreglo[0])+1;
+  int tamano = 15;
     // make a string for assembling the data to log:
   String dataString = "";
 
@@ -182,6 +161,8 @@ void guardadito(float* arreglo){
     Serial.println(dataString);
     Serial.println("guardadito complited AAAAAAAAAAAAAAAAAAAAAAAAA");
 
+    delay(1000);
+
   }
   // if the file isn't open, pop up an error:
   else {
@@ -189,12 +170,98 @@ void guardadito(float* arreglo){
   }
 }
 
-//La funcion para leer los datos del gps, a esta parte falta darle formato para que entregue unicamente la posicion del cansat. Con el link que te mande puedes ver como entrega 
+//La funcion para leer los datos del gps, queremos que entregue latitud, longitud, y tiempo
 // la posicion este gps
 void gpsFuncion(){
-   char gpsDatos=' ';
-  if(gps.available()){
-    gpsDatos=gps.read();
-    Serial.print(gpsDatos);
+  Serial.print(F("Location: ")); 
+  if (gps.location.isValid())
+  {
+    Latitud = gps.location.lat();
+    Longitud = gps.location.lng();
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
   }
+  else
+  {
+    Latitud = 19.327450;
+    Longitud =-99.178960;
+    Serial.print(F("INVALID"));
+  }
+
+  Serial.print(F("  Time: "));
+
+  Serial.print(F(" "));
+  if (gps.time.isValid())
+  {
+    if (gps.time.hour() < 10) Serial.print(F("0"));
+    hora = gps.time.hour();
+    minuto=gps.time.minute();
+    segundo=gps.time.second();
+    Serial.print(gps.time.hour());
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F("."));
+    if (gps.time.centisecond() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.centisecond());
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+    hora = 0.0;
+    minuto=0.0;
+    segundo=0.0;
+  }
+  //Serial.println(gps.speed.mps()); // Speed in meters per second (double)
+  Serial.println();
+    datos_gps[1] = Latitud;
+    datos_gps[2] = Longitud;
+    datos_gps[3] = hora;
+    datos_gps[4] = minuto;
+    datos_gps[5] = segundo;
+}
+
+//Esta funcion te entrega los valores del sensor gy 91
+void altitudmovimiento(){
+ //Declaramos la lista que regresara el valor de cada variable
+  Temp = bmp.readTemperature();
+  Pres = bmp.readPressure();
+  Alt = bmp.readAltitude(1013.25); /* Adjusted to local forecast! */
+ 
+  mySensor.accelUpdate();
+  aX = mySensor.accelX();
+  aY = mySensor.accelY();
+  aZ = mySensor.accelZ();
+  aSqrt = mySensor.accelSqrt();
+
+  mySensor.gyroUpdate();
+  gX = mySensor.gyroX();
+  gY = mySensor.gyroY();
+  gZ = mySensor.gyroZ();
+
+  mySensor.magUpdate();
+  mX = mySensor.magX();
+  mY = mySensor.magY();
+  mZ = mySensor.magZ();
+  mySensor.magHorizDirection();
+  mDirection = mySensor.magHorizDirection();
+  
+  datos_AltMov[1] = Temp;
+  datos_AltMov[2] = Pres;
+  datos_AltMov[3] = Alt;
+  datos_AltMov[4] = aX;
+  datos_AltMov[5] = aY;
+  datos_AltMov[6] = aZ;
+  datos_AltMov[7] = aSqrt;
+  datos_AltMov[8] = gX;
+  datos_AltMov[9] = gY;
+  datos_AltMov[10] = gZ;
+  datos_AltMov[11] = mX;
+  datos_AltMov[12] = mY;
+  datos_AltMov[13] = mZ;
+  datos_AltMov[14] = mDirection;
 }
