@@ -6,7 +6,7 @@
 #include <Adafruit_BMP280.h>
 #include <MPU9250_asukiaaa.h> 
 #include <Servo.h>
-#include "MS5611.h"
+//#include "MS5611.h"
 Servo myservo; 
 
 Adafruit_BMP280 bmp;
@@ -14,9 +14,9 @@ MPU9250_asukiaaa mySensor;
 // The TinyGPSPlus object
 TinyGPSPlus gps;
 
-//Libreria de la sd
-#include <SPI.h>
-#include <SD.h>
+// //Libreria de la sd
+// #include <SPI.h>
+// #include <SD.h>
 
 #define buzzer 9
 #define led 5
@@ -35,7 +35,8 @@ int result;
 
 
 void setup() {
-
+  Serial.begin(9600);
+  gps_ss.begin(9600); 
   pinMode(buzzer, OUTPUT);
   noTone(buzzer);
 
@@ -43,8 +44,6 @@ void setup() {
 
   myservo.attach(5);  // attaches the servo on pin A3 to the servo object
 
-  Serial.begin(9600);
-  gps_ss.begin(9600); 
   //Comprobamos sensor de altitud movimiento:
   mySensor.beginAccel();
   mySensor.beginGyro();
@@ -61,14 +60,14 @@ void setup() {
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
   //Comprobamos la tarjeta SD
-  Serial.print("Initializing SD card...");
-  if (!SD.begin(10)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:  }
-  }
-    else{
-  Serial.println("card initialized.");
-  }
+  // Serial.print("Initializing SD card...");
+  // if (!SD.begin(10)) {
+  //   Serial.println("Card failed, or not present");
+  //   // don't do anything more:  }
+  // }
+  //   else{
+  // Serial.println("card initialized.");
+  // }
 }
 
 
@@ -79,12 +78,26 @@ void loop() {
   gpsFuncion();
 
   //Queremos formar una variable que contenga cada uno de los valores de GPS, GY91
-  char paquete[250];
-
+  char paquete[300];
+  //Y una variable temporal donde almacenaremos los datos. tiene longitud 19 porque queremos almacenar 19 variables
+  char buffer[19][15];
+  //Tenemos que pasar los datos de float a string
+  for(int i = 0; i < 6; i++){
+  dtostrf(datos_gps[i+1],2,6,buffer[i]);
+  }
+  for(int i = 6; i < 20; i++){
+  dtostrf(datos_AltMov[i-5],2,6,buffer[i]);
+  }
+  //Luego pasamos los valores de los datos a un string
+  
   //Ahora se enviara una p que representa que es la carga principal para la carga secundaria se enviara una s
-  sprintf(paquete, "p%.9f,%.9f,%.9f,%.9f,%.9f%,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f",Latitud, Longitud, hora, minuto,segundo,Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection);
+  //sprintf(paquete, "p,%f,%.9f,%.9f,%.9f,%.9f%,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f",Latitud, Longitud, hora, minuto,segundo,Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection);
+  sprintf(paquete, "p,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15], buffer[16], buffer[17], buffer[18]);
+  Serial.println();
+
   // Enviar el paquete
-  Serial.write(paquete);
+  Serial.print(paquete);
+  Serial.println();
   delay(100);
 
   //   //Imprimimos los datos de cada cosa
@@ -147,63 +160,63 @@ void alarma(){
 
 //La funcion guardadito toma un arreglo y lo guarda en la ssd
 //La funcion guardadito toma un arreglo y lo guarda en la ssd
-void guardadito(float* arreglo){
-  //int tamano = sizeof(arreglo[0])+1;
-  int tamano = 15;
-    // make a string for assembling the data to log:
-  String dataString = "";
+// void guardadito(float* arreglo){
+//   //int tamano = sizeof(arreglo[0])+1;
+//   int tamano = 15;
+//     // make a string for assembling the data to log:
+//   String dataString = "";
 
-  for (int i = 0; i < tamano; i++) {
-    dataString += String(arreglo[i]); // Agregar cada elemento del arreglo al String
-    if (i < tamano - 1) {
-      dataString += ", "; // Agregar una coma y un espacio después de cada elemento, excepto el último
-    }
-  }
+//   for (int i = 0; i < tamano; i++) {
+//     dataString += String(arreglo[i]); // Agregar cada elemento del arreglo al String
+//     if (i < tamano - 1) {
+//       dataString += ", "; // Agregar una coma y un espacio después de cada elemento, excepto el último
+//     }
+//   }
 
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+//   // open the file. note that only one file can be open at a time,
+//   // so you have to close this one before opening another.
+//   File dataFile = SD.open("datalog.txt", FILE_WRITE);
 
-  // if the file is available, write to it:
-  if (dataFile) {
-    Serial.println("Guardando Datos");
-    dataFile.println(dataString);
-    dataFile.close();
-    // print to the serial port too:
-    Serial.println(dataString);
-    Serial.println("guardadito hecho");
+//   // if the file is available, write to it:
+//   if (dataFile) {
+//     Serial.println("Guardando Datos");
+//     dataFile.println(dataString);
+//     dataFile.close();
+//     // print to the serial port too:
+//     Serial.println(dataString);
+//     Serial.println("guardadito hecho");
 
-    delay(1000);
+//     delay(1000);
 
-  }
-  // if the file isn't open, pop up an error:
-  else {
-    Serial.println("error opening datalog.txt");
-  }
-}
+//   }
+//   // if the file isn't open, pop up an error:
+//   else {
+//     Serial.println("error opening datalog.txt");
+//   }
+// }
 
 //La funcion para leer los datos del gps, queremos que entregue latitud, longitud, y tiempo
 // la posicion este gps
 void gpsFuncion(){
-  Serial.print(F("Location: ")); 
+  // Serial.print(F("Location: ")); 
   if (gps.location.isValid())
   {
     Latitud = gps.location.lat();
     Longitud = gps.location.lng();
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
+    // Serial.print(gps.location.lat(), 6);
+    // Serial.print(F(","));
+    // Serial.print(gps.location.lng(), 6);
   }
   else
   {
-    Latitud = 19.327450;
+    Latitud =19.327450;
     Longitud =-99.178960;
-    Serial.print(F("INVALID"));
+    //Serial.print(F("INVALID"));
   }
 
-  Serial.print(F("  Time: "));
+  // Serial.print(F("  Time: "));
 
-  Serial.print(F(" "));
+  // Serial.print(F(" "));
   if (gps.time.isValid())
   {
     if (gps.time.hour() < 10) Serial.print(F("0"));
@@ -213,13 +226,13 @@ void gpsFuncion(){
   }
   else
   {
-    Serial.print(F("INVALID"));
+    //Serial.print(F("INVALID"));
     hora = 0.0;
     minuto=0.0;
     segundo=0.0;
   }
   //Serial.println(gps.speed.mps()); // Speed in meters per second (double)
-  Serial.println();
+  // Serial.println();
     datos_gps[1] = Latitud;
     datos_gps[2] = Longitud;
     datos_gps[3] = hora;
