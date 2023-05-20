@@ -96,7 +96,7 @@ void loop() {
   Serial.println();
 
   // Enviar el paquete
-  Serial.print(paquete);
+  Serial.write(paquete);
   Serial.println();
   delay(100);
 
