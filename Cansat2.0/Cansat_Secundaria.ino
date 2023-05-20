@@ -74,29 +74,25 @@ void setup() {
 
 void loop() {
   //Guardamos los datos en dos arrays
-  altitudmovimiento();
   gpsFuncion();
 
   //Queremos formar una variable que contenga cada uno de los valores de GPS, GY91
-  char paquete[300];
+  char paquete[100];
   //Y una variable temporal donde almacenaremos los datos. tiene longitud 19 porque queremos almacenar 19 variables
-  char buffer[19][15];
+  char buffer[5][15];
   //Tenemos que pasar los datos de float a string
   for(int i = 0; i < 6; i++){
   dtostrf(datos_gps[i+1],2,6,buffer[i]);
-  }
-  for(int i = 6; i < 20; i++){
-  dtostrf(datos_AltMov[i-5],2,6,buffer[i]);
   }
   //Luego pasamos los valores de los datos a un string
   
   //Ahora se enviara una p que representa que es la carga principal para la carga secundaria se enviara una s
   //sprintf(paquete, "p,%f,%.9f,%.9f,%.9f,%.9f%,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f",Latitud, Longitud, hora, minuto,segundo,Temp, Pres, Alt, aX, aY, aZ, aSqrt, gX, gY, gZ, mX, mY, mZ, mDirection);
-  sprintf(paquete, "p,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15], buffer[16], buffer[17], buffer[18]);
+  sprintf(paquete, "p,%s,%s,%s,%s,%s", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5]);
   Serial.println();
 
   // Enviar el paquete
-  Serial.write(paquete);
+  Serial.print(paquete);
   Serial.println();
   delay(100);
 
@@ -238,48 +234,4 @@ void gpsFuncion(){
     datos_gps[3] = hora;
     datos_gps[4] = minuto;
     datos_gps[5] = segundo;
-}
-
-//Esta funcion te entrega los valores del sensor gy 91
-void altitudmovimiento(){
- //Declaramos la lista que regresara el valor de cada variable
-  //Temp = 5.55555555;
-
-
-  Temp = bmp.readTemperature();
-  Pres = bmp.readPressure();
-  Alt = bmp.readAltitude(1013.25); /* Adjusted to local forecast! */
- 
-  mySensor.accelUpdate();
-  aX = mySensor.accelX();
-  aY = mySensor.accelY();
-  aZ = mySensor.accelZ();
-  aSqrt = mySensor.accelSqrt();
-
-  mySensor.gyroUpdate();
-  gX = mySensor.gyroX();
-  gY = mySensor.gyroY();
-  gZ = mySensor.gyroZ();
-
-  mySensor.magUpdate();
-  mX = mySensor.magX();
-  mY = mySensor.magY();
-  mZ = mySensor.magZ();
-  mySensor.magHorizDirection();
-  mDirection = mySensor.magHorizDirection();
-  
-  datos_AltMov[1] = Temp;
-  datos_AltMov[2] = Pres;
-  datos_AltMov[3] = Alt;
-  datos_AltMov[4] = aX;
-  datos_AltMov[5] = aY;
-  datos_AltMov[6] = aZ;
-  datos_AltMov[7] = aSqrt;
-  datos_AltMov[8] = gX;
-  datos_AltMov[9] = gY;
-  datos_AltMov[10] = gZ;
-  datos_AltMov[11] = mX;
-  datos_AltMov[12] = mY;
-  datos_AltMov[13] = mZ;
-  datos_AltMov[14] = mDirection;
 }
